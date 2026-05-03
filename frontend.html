@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Todo App with Blackbox AI</title>
+  <style>
+    body { font-family: Arial; max-width: 800px; margin: 0 auto; padding: 20px; }
+    input, button { padding: 10px; margin: 5px; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 10px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+    .ai { background: #e3f2fd; }
+    h1 { color: #333; }
+  </style>
+</head>
+<body>
+  <h1>Todo App + Blackbox AI</h1>
+  <input id="prompt" placeholder="AI prompt e.g. grocery" />
+  <button onclick="generateTasks()">Generate AI Tasks</button>
+  <input id="title" placeholder="Manual task title" />
+  <button onclick="addTask()">Add Task</button>
+  <ul id="taskList"></ul>
+  <button onclick="loadTasks()">Refresh</button>
+  <button onclick="clearAll()">Clear All</button>
+
+  <script>
+    const API_BASE = 'http://localhost:5000';
+
+    async function loadTasks() {
+      const res = await fetch(`${API_BASE}/tasks`);
+      const tasks = await res.json();
+      const list = document.getElementById('taskList');
+      list.innerHTML = tasks.map(t => `<li class="${t.ai ? 'ai' : ''}">${t.title} <span style="margin-left: auto;">
+        <button onclick="toggle('${t.id}')">${t.completed ? 'Done' : 'Pending'}</button> 
+        <button onclick="remove('${t.id}')">Delete</button>
+      </span></li>`).join('');
+    }
+
+    async function generateTasks() {
+      const prompt = document.getElementById('prompt').value;
+      if (!prompt) return alert('Enter prompt');
+      try {
+        const res = await fetch(`${API_BASE}/tasks/ai-generate`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({prompt})
+        });
+        if (res.ok) {
+          loadTasks();
+          document.getElementById('prompt').value = '';
+        } else {
+          const err = await res.json();
+          alert('AI gen failed: ' + err.error);
+        }
+      } catch (e) {
+        alert('Connection error');
+      }
+    }
+
+    async function addTask() {
+      const title = document.getElementById('title').value;
+      if (!title) return alert('Enter title');
+      await fetch(`${API_BASE}/tasks`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title})
+      });
+      loadTasks();
+      document.getElementById('title').value = '';
+    }
+
+    async function toggle(id) {
+      const res = await fetch(`${API_BASE}/tasks/${id}`);
+      const task = await res.json();
+      await fetch(`${API_BASE}/tasks/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({completed: !task.completed})
+      });
+      loadTasks();
+    }
+
+    async function remove(id) {
+      await fetch(`${API_BASE}/tasks/${id}`, {method: 'DELETE'});
+      loadTasks();
+    }
+
+    async function clearAll() {
+      tasks = [];
+      loadTasks();
+    }
+
+    loadTasks();
+  </script>
+</body>
+</html>
